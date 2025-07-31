@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <title>企微参数解析</title>
   <style>
-    body{font-family:Arial,Helvetica,sans-serif;font-size:14px;margin:20px;}
+    body{font-family:Arial,Helvetica,sans-serif;margin:20px;font-size:14px;}
     .key{font-weight:bold;margin-top:10px;}
     .val{margin-left:20px;word-break:break-all;}
   </style>
@@ -14,53 +14,47 @@
   <div id="result">正在解析…</div>
 
 <script>
-/* ---------- 1. 工具函数 ---------- */
-// Base64 → WordArray
-function base64ToWordArray(b64){
-  return CryptoJS.enc.Base64.parse(b64);
-}
-
-// AES-128-CBC 解密
-function decrypt(cipherB64, keyStr, ivStr){
-  const key = CryptoJS.enc.Utf8.parse(keyStr.replace(/-/g,'').slice(0,16)); // 取16字节
-  const iv  = CryptoJS.enc.Utf8.parse(ivStr.replace(/-/g,'').slice(0,16));
-  const decrypted = CryptoJS.AES.decrypt(
-    { ciphertext: base64ToWordArray(cipherB64) },
-    key,
-    { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
-  );
-  return decrypted.toString(CryptoJS.enc.Utf8);
-}
-
-/* ---------- 2. 主逻辑 ---------- */
+/* ---------------- 1. 固定配置 ---------------- */
 const KEY = '03A1B7280B5BC-F60B934C-CABD-4272-94EF-CF99BAF32B8D';
 const IV  = '03A1B7280B5BC-3053BBF3-0A52-4A49-ACD8-AF5CC45C96F3';
 
-// 需要解密的字段列表
-const encryptedFields = [
-  'rd','fsw','fsh','ph','un','qd','srm','rm','nc','fnc','rn','ts','fp','rtp','rta','fopenid','orderId'
-];
+/* 取 16 字节 hex（AES-128-CBC 需要 128 bit） */
+const keyHex = KEY.replace(/-/g,'').slice(0,32);
+const ivHex  = IV.replace(/-/g,'').slice(0,32);
 
-// 解析 URL 查询串
+/* ---------------- 2. 解密函数 ---------------- */
+function decrypt(base64Cipher){
+  try{
+    const decrypted = CryptoJS.AES.decrypt(
+      { ciphertext: CryptoJS.enc.Base64.parse(base64Cipher) },
+      CryptoJS.enc.Hex.parse(keyHex),
+      { iv: CryptoJS.enc.Hex.parse(ivHex), mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+    );
+    return decrypted.toString(CryptoJS.enc.Utf8) || '(解密为空)';
+  }catch(e){
+    return '(解密异常)';
+  }
+}
+
+/* ---------------- 3. 解析 & 展示 ---------------- */
 const params = new URLSearchParams(location.search);
+const encryptedKeys = [
+  'rd','fsw','fsh','ph','un','qd','srm','rm',
+  'nc','fnc','rn','ts','fp','rtp','rta','fopenid','orderId'
+];
 
 let html = '';
 for (const [k, v] of params){
-  let display = v || '(空)';
-  if (v && encryptedFields.includes(k)){
-    try{
-      display = decrypt(v, KEY, IV) || '(解密失败)';
-    }catch(e){
-      display = '(解密异常)';
-    }
+  let show = v || '(空)';
+  if (v && encryptedKeys.includes(k)){
+    show = decrypt(decodeURIComponent(v));
   }
-  html += `<div class="key">${k}</div><div class="val">${display}</div>`;
+  html += `<div class="key">${k}</div><div class="val">${show}</div>`;
 }
-
 document.getElementById('result').innerHTML = html;
 </script>
 
-<!-- 引入 CryptoJS（AES 解密库）-->
+<!-- CryptoJS CDN -->
 <script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
 </body>
 </html>
