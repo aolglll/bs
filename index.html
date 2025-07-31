@@ -1,548 +1,66 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
-
 <head>
-    <meta charset="UTF-8">
-    <title>拉取并下载私聊记录</title>
-    <style>
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif;
-            padding: 20px;
-            background: #f7f7f7
-        }
-
-        button {
-            margin-top: 10px;
-            padding: 8px 16px;
-            font-size: 14px
-        }
-    </style>
+  <meta charset="UTF-8">
+  <title>企微参数解析</title>
+  <style>
+    body{font-family:Arial,Helvetica,sans-serif;font-size:14px;margin:20px;}
+    .key{font-weight:bold;margin-top:10px;}
+    .val{margin-left:20px;word-break:break-all;}
+  </style>
 </head>
-
 <body>
-    <h2>拉取私聊记录接口结果</h2>
-    <button id="downloadBtn" style="display:none">下载 JSON</button>
-    <a id="downloadCsvBtn" href="#"
-        style="display:none; margin-left: 10px; text-decoration: none; padding: 8px 16px; font-size: 14px; background-color: #0078d7; color: white; border: none; border-radius: 4px; cursor: pointer;">下载
-        CSV (飞书多维表格格式)</a>
-    <div style="margin-top: 10px; width: 100%; background-color: #e0e0e0; border-radius: 5px;">
-        <div id="progressBar"
-            style="height: 20px; width: 0%; background-color: #4CAF50; border-radius: 5px; transition: width 0.3s ease;">
-        </div>
-    </div>
-    <pre id="result"
-        style="margin-top: 20px; padding: 10px; background: white; max-height: 400px; overflow: auto;"></pre>
+  <h1>企微 URL 参数解析结果</h1>
+  <div id="result">正在解析…</div>
 
-    <script>
-        // 全局变量存储所有数据
-        let allTableData = [];
-        // ========== 1. 基础配置 ==========
-        const TOKEN = '6dc03c42-ac2a-4fa5-88a0-8edcd7a3df60';   // 如失效请替换
-        const API = 'https://gateway.bilinl.com/kfweb/Chat/GetUserListByType';
-        name()
-        var ssssqq = 1
-        // 添加月份迭代控制变量
-        // 修复月份迭代范围，确保只处理12个月
-        var currentMonth = 0; // 从0开始迭代
-        var totalMonths = 12; // 总月份数
+<script>
+/* ---------- 1. 工具函数 ---------- */
+// Base64 → WordArray
+function base64ToWordArray(b64){
+  return CryptoJS.enc.Base64.parse(b64);
+}
 
+// AES-128-CBC 解密
+function decrypt(cipherB64, keyStr, ivStr){
+  const key = CryptoJS.enc.Utf8.parse(keyStr.replace(/-/g,'').slice(0,16)); // 取16字节
+  const iv  = CryptoJS.enc.Utf8.parse(ivStr.replace(/-/g,'').slice(0,16));
+  const decrypted = CryptoJS.AES.decrypt(
+    { ciphertext: base64ToWordArray(cipherB64) },
+    key,
+    { iv, mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
+  );
+  return decrypted.toString(CryptoJS.enc.Utf8);
+}
 
+/* ---------- 2. 主逻辑 ---------- */
+const KEY = '03A1B7280B5BC-F60B934C-CABD-4272-94EF-CF99BAF32B8D';
+const IV  = '03A1B7280B5BC-3053BBF3-0A52-4A49-ACD8-AF5CC45C96F3';
 
-        // 生成指定月份的开始和结束日期
-        function getMonthRange(currentMonth, offset) {
-            // 确保参数是数字且在合理范围内
-            if (typeof currentMonth !== 'number' || isNaN(currentMonth) || typeof offset !== 'number' || isNaN(offset)) {
-                throw new TypeError('currentMonth and offset must be valid numbers');
-            }
+// 需要解密的字段列表
+const encryptedFields = [
+  'rd','fsw','fsh','ph','un','qd','srm','rm','nc','fnc','rn','ts','fp','rtp','rta','fopenid','orderId'
+];
 
-            // 限制偏移量范围，避免极端值导致日期无效
-            if (offset < -10000 || offset > 10000) {
-                throw new RangeError('offset is out of reasonable range');
-            }
+// 解析 URL 查询串
+const params = new URLSearchParams(location.search);
 
-            try {
-                // 使用UTC方法可以避免时区问题导致的日期偏移
-                const now = new Date();
-                const year = now.getFullYear();
+let html = '';
+for (const [k, v] of params){
+  let display = v || '(空)';
+  if (v && encryptedFields.includes(k)){
+    try{
+      display = decrypt(v, KEY, IV) || '(解密失败)';
+    }catch(e){
+      display = '(解密异常)';
+    }
+  }
+  html += `<div class="key">${k}</div><div class="val">${display}</div>`;
+}
 
-                // 直接计算目标年月，避免setMonth的潜在问题
-                let targetMonth = currentMonth + offset;
-                let targetYear = year;
+document.getElementById('result').innerHTML = html;
+</script>
 
-                // 处理月份溢出，手动计算年份和月份
-                if (targetMonth < 0) {
-                    // 计算负向偏移对应的年份和月份
-                    const yearsToSubtract = Math.floor((-targetMonth - 1) / 12) + 1;
-                    targetYear = year - yearsToSubtract;
-                    const monthsInLastYear = (-targetMonth - 1) % 12 + 1;
-                    targetMonth = 12 - monthsInLastYear;
-                } else if (targetMonth > 11) {
-                    // 计算正向偏移对应的年份和月份
-                    const yearsToAdd = Math.floor(targetMonth / 12);
-                    targetYear = year + yearsToAdd;
-                    targetMonth = targetMonth % 12;
-                }
-
-                // 创建日期对象
-                const startDateObj = new Date(targetYear, targetMonth, 1);
-                const endDateObj = new Date(targetYear, targetMonth + 1, 0);
-
-                // 验证日期有效性
-                if (startDateObj.getFullYear() !== targetYear ||
-                    startDateObj.getMonth() !== targetMonth) {
-                    throw new Error('Start date validation failed');
-                }
-
-                // 验证结束日期是否为目标月份的最后一天
-                // 当targetMonth为11(12月)时，endDateObj的月份会是0(1月)，年份会+1
-                const expectedEndYear = targetMonth === 11 ? targetYear + 1 : targetYear;
-                const expectedEndMonth = targetMonth === 11 ? 0 : targetMonth;
-
-                if (endDateObj.getMonth() !== expectedEndMonth ||
-                    endDateObj.getFullYear() !== expectedEndYear) {
-                    throw new Error('End date validation failed');
-                }
-
-                const startDate = startDateObj.toISOString().slice(0, 10);
-                const endDate = endDateObj.toISOString().slice(0, 10);
-
-                return { startDate, endDate };
-            } catch (error) {
-                console.error('Error calculating month range:', error);
-                return { startDate: null, endDate: null };
-            }
-        }
-
-
-        // 生成当天到上个月的日期范围
-        function getTodayToLastMonthRange() {
-            try {
-                const now = new Date();
-                const currentMonth = now.getMonth();
-                const today = now.toISOString().slice(0, 10);
-
-                // 获取上个月的日期范围
-                const lastMonthRange = getMonthRange(currentMonth, -1);
-                if (!lastMonthRange.startDate || !lastMonthRange.endDate) {
-                    throw new Error('Failed to get last month range');
-                }
-
-                return {
-                    startDate: lastMonthRange.startDate,
-                    endDate: today
-                };
-            } catch (error) {
-                console.error('Error calculating today to last month range:', error);
-                return { startDate: null, endDate: null };
-            }
-        }
-        var tehsh = "2025-05-30"
-        var tehshs = "2025-05-01"
-
-        function name() {
-            // 重置全局数据
-            // allTableData = [];
-            // ========== 2. 生成日期范围（按月） ========== 
-            // 示例: 获取当天到上个月的日期范围
-            // const dateRange = getTodayToLastMonthRange();
-            // console.log('Date range:', dateRange);
-            // 获取当前月份(0-11)
-            const currentDate = new Date();
-            const currentMonth = currentDate.getMonth();
-
-
-            // 获取上一个月的范围
-            const { startDate, endDate } = getMonthRange(currentMonth, 0);
-            // 存储当前日期范围，用于文件名
-            this.currentStartDate = startDate;
-            this.currentEndDate = endDate;
-
-            if (!startDate || !endDate) {
-                console.error('无法获取有效的日期范围');
-                return;
-            }
-            console.log(`正在处理 ${startDate} 至 ${endDate} 的数据`);
-            // ========== 3. POST 参数 ==========
-
-            const payload = {
-                dtEndTime: tehsh,
-                dtStartTime: tehshs,
-                nAccSessionType: 2,
-                nIsLoseFriends: -1,
-                nOverChildId: 0,
-                nOverParentId: 0,
-                nPageIndex: ssssqq,
-                nPageSize: 50,
-                nState: 12,
-                nType: 1,
-                nWxType: -1,
-                vcSearchKey: "",
-                vcSearchType: 0
-            };
-
-            // ========== 4. 发送请求 ==========
-            fetch(API, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${TOKEN}`
-                },
-                body: JSON.stringify(payload)
-            })
-                .then(r => r.json())
-                .then(async data => {
-                    if (data.code === 2012) {
-                        alert('认证失败，请先登录！');
-                        return;
-                    }
-
-                    // 5. 把返回的数据转成 Blob，再触发下载
-                    console.log(data.data.UserList.length);
-
-
-                    let dgsng = data.data.UserList;
-
-                    // 使用异步函数和延迟控制请求频率
-                    // 获取当前月份(0-11)
-                    const currentDate = new Date();
-                    const currentMonth = currentDate.getMonth();
-
-                    // 获取上一个月的范围
-                    const { startDate, endDate } = getMonthRange(currentMonth, 0);
-
-                    if (!startDate || !endDate) {
-                        console.error('无法获取有效的日期范围');
-                        return;
-                    }
-
-                    async function processRequests() {
-                        const totalRequests = dgsng.length;
-                        let completedRequests = 0;
-                        for (const element of dgsng) {
-                            const payload = {
-                               dtEndTime: tehsh,
-                dtStartTime: tehshs,
-                                nId: 0,
-                                nMessageTypes: [],
-                                nPageIndex: 1,
-                                nPageSize: 10,
-                                nType: 10,
-                                vcCustomerID: element.vcCustomerID,
-                                vcRobotWxID: element.vcRobotWxID,
-                                vcSearchKey: "",
-                                vcUser: element.vcUser
-                            };
-
-                            try {
-                                // 发送请求并等待响应
-                                const response = await fetch("https://gateway.bilinl.com/kfweb/Chat/GetMsgDetail", {
-                                    method: "POST",
-                                    headers: {
-                                        'Content-Type': 'application/json',
-                                        'Authorization': `Bearer ${TOKEN}`
-                                    },
-                                    body: JSON.stringify(payload)
-                                });
-
-                                const data = await response.json();
-                                //console.log(data.data.Table1);
-                                // 检查Table1是否存在且不为空
-                                if (data.data.Table1 && data.data.Table1.length > 0) {
-                                    let dgfbs = []
-                                    for (let index = 0; index < data.data.Table1.length; index++) {
-                                        const element = data.data.Table1[index];
-                                        // console.log(element);
-                                        let dwgwg = {
-
-                                            vcContent: element.vcContent,
-                                            vcCustomerName: element.vcCustomerName,
-                                            dtMsgTime: element.dtMsgTime,
-                                            vcCustomerID: element.vcCustomerID,
-                                            vcRobotWxID: element.vcRobotWxID,
-                                        }
-                                        dgfbs.push(dwgwg)
-                                    }
-                                    allTableData.push(dgfbs)
-
-                                    // allTableData.push(...data.data.Table1.map(item => ({
-                                    //     vcContent: item.vcContent,
-                                    //     vcCustomerName: item.vcCustomerName,
-                                    //     dtMsgTime: item.dtMsgTime
-                                    // })));
-                                } else {
-                                    console.log("当前请求返回的Table1为空，跳过处理");
-                                }
-
-                                // 等待2秒后再发送下一个请求
-                                completedRequests++;
-                                const progressPercentage = (completedRequests / totalRequests) * 100;
-                                const progressBar = document.getElementById("progressBar");
-                                if (progressBar) {
-                                    progressBar.style.width = `${progressPercentage}%`;
-                                    // 添加进度文本显示
-                                    progressBar.textContent = `${progressPercentage.toFixed(0)}%`;
-                                } else {
-                                    console.error("未找到进度条元素");
-                                }
-                                await new Promise(resolve => setTimeout(resolve, 100));
-                            } catch (err) {
-                                console.error("请求失败:", err);
-                                // 即使某个请求失败，也继续处理下一个
-                                completedRequests++;
-                                const progressPercentage = (completedRequests / totalRequests) * 100;
-                                document.getElementById("progressBar").style.width = `${progressPercentage}%`;
-                                await new Promise(resolve => setTimeout(resolve, 100));
-                            }
-                        }
-
-                        // 所有请求完成后处理结果
-                        console.log("所有请求完成，集成数据总数:", allTableData.length);
-                        // 批次内排序
-                        allTableData.sort((a, b) => {
-                            const dateA = new Date(a.dtMsgTime);
-                            const dateB = new Date(b.dtMsgTime);
-                            if (isNaN(dateA.getTime())) return 1;
-                            if (isNaN(dateB.getTime())) return -1;
-                            return dateA - dateB;
-                        });
-                        document.getElementById("result").textContent = JSON.stringify(allTableData, null, 2);
-                        console.log("准备生成CSV并显示下载按钮");
-                        // 生成CSV并显示下载按钮
-                        // if (typeof generateCsvAndShowDownload === 'function') {
-                        //     console.log("generateCsvAndShowDownload函数存在，准备调用");
-                        //     generateCsvAndShowDownload(allTableData);
-                        // } else {
-                        //     console.error("generateCsvAndShowDownload函数不存在");
-                        // }
-
-                        // 显示JSON下载按钮
-                        const jsonDownloadBtn = document.getElementById('downloadBtn');
-                        if (jsonDownloadBtn) {
-                            jsonDownloadBtn.style.display = 'inline-block';
-                            jsonDownloadBtn.disabled = !allTableData || allTableData.length === 0;
-                            jsonDownloadBtn.style.backgroundColor = jsonDownloadBtn.disabled ? '#cccccc' : '#0078d7';
-                            jsonDownloadBtn.style.cursor = jsonDownloadBtn.disabled ? 'not-allowed' : 'pointer';
-                            console.log(`JSON下载按钮状态: ${jsonDownloadBtn.disabled ? '禁用' : '启用'}`);
-                            // 添加点击事件
-                            jsonDownloadBtn.onclick = function () {
-                                console.log("点击JSON下载按钮");
-                                // 转换为[[Table1的数据],[Table1的数据]]格式
-                                const formattedData = [allTableData, allTableData];
-                                downloadJson(formattedData, this.currentStartDate, this.currentEndDate);
-                            }.bind(this);
-                        } else {
-                            console.error("未找到id为downloadBtn的元素");
-                        }
-                    }
-
-                    // 等待当前批次请求完成后再决定是否递归
-                    await processRequests();
-                    console.log("当前页码:", ssssqq, "用户列表长度:", data.data.UserList.length);
-                    // 修复递归调用问题，限制最大递归深度
-                    if (data.data.UserList.length > 0 && ssssqq < 100) {
-                        ssssqq++;
-                        // 使用setTimeout避免栈溢出
-                        setTimeout(name, 100);
-                    } else {
-                        console.log("当前月份数据加载完成，数据长度:", allTableData.length);
-                        if (allTableData.length > 0) {
-                            // 转换为[[Table1的数据],[Table1的数据]]格式
-                            const formattedData = [allTableData, allTableData];
-                            downloadJson(formattedData, this.currentStartDate, this.currentEndDate);
-                        } else {
-                            console.log("当前月份没有数据可下载");
-                        }
-                        currentMonth++;
-                        if (currentMonth < totalMonths) {
-                            ssssqq = 1; // 重置页码
-                            setTimeout(name, 100);
-                        } else {
-                            console.log("所有月份数据加载完成");
-                            // 最终排序所有数据
-                            // 清除重复数据
-                            const uniqueData = [...new Map(allTableData.map(item => [item.dtMsgTime + item.vcContent, item])).values()];
-                            allTableData = uniqueData;
-                            // 找出数据中的最早和最晚日期
-                            const dates = allTableData.map(item => new Date(item.dtMsgTime))
-                                .filter(date => !isNaN(date.getTime()));
-                            if (dates.length > 0) {
-                                const earliestDate = new Date(Math.min(...dates));
-                                const latestDate = new Date(Math.max(...dates));
-                                const startDate = earliestDate.toISOString().slice(0, 10);
-                                const endDate = latestDate.toISOString().slice(0, 10);
-                                // 转换为[[Table1的数据],[Table1的数据]]格式
-                                const formattedData = [allTableData, allTableData];
-                                downloadJson(formattedData, startDate, endDate);
-                            } else {
-                                downloadJson(allTableData);
-                            }
-                            allTableData.sort((a, b) => {
-                                const dateA = new Date(a.dtMsgTime);
-                                const dateB = new Date(b.dtMsgTime);
-                                // 处理无效日期
-                                if (isNaN(dateA.getTime())) {
-                                    console.error('无效日期格式:', a.dtMsgTime);
-                                    return 1; // 无效日期放后面
-                                }
-                                if (isNaN(dateB.getTime())) {
-                                    console.error('无效日期格式:', b.dtMsgTime);
-                                    return -1; // 无效日期放后面
-                                }
-                                return dateA - dateB;
-                            });
-                            console.log("所有数据已排序，总数:", allTableData.length);
-                            // 最终更新UI
-                            document.getElementById("result").textContent = JSON.stringify(allTableData, null, 2);
-                            if (typeof generateCsvAndShowDownload === 'function') {
-                                generateCsvAndShowDownload(allTableData);
-                            }
-                            // 自动下载JSON文件
-                            if (allTableData.length > 0) {
-                                console.log("自动开始JSON下载");
-                                // 找出数据中的最早和最晚日期
-                                const dates = allTableData.map(item => new Date(item.dtMsgTime))
-                                    .filter(date => !isNaN(date.getTime()));
-                                if (dates.length > 0) {
-                                    const earliestDate = new Date(Math.min(...dates));
-                                    const latestDate = new Date(Math.max(...dates));
-                                    const startDate = earliestDate.toISOString().slice(0, 10);
-                                    const endDate = latestDate.toISOString().slice(0, 10);
-                                    downloadJson(allTableData, startDate, endDate);
-                                } else {
-                                    downloadJson(allTableData);
-                                }
-                            } else {
-                                console.log("没有数据可下载");
-                            }
-                        }
-                    }
-                })
-                .catch(err => {
-                    alert('请求出错:\n' + err);
-                });
-
-        }
-
-        // 生成CSV并显示下载按钮
-        function generateCsvAndShowDownload(data) {
-            console.log("进入generateCsvAndShowDownload函数，数据长度:", data ? data.length : 0);
-            if (!data || data.length === 0) {
-                return
-                // console.log("没有数据可导出");
-                // alert('没有数据可导出');
-                // 即使没有数据，也显示按钮（禁用状态）以便用户了解功能
-                const downloadBtn = document.getElementById('downloadCsvBtn');
-                if (downloadBtn) {
-                    downloadBtn.style.display = 'inline-block';
-                    downloadBtn.disabled = !data || data.length === 0;
-                    downloadBtn.style.backgroundColor = downloadBtn.disabled ? '#cccccc' : '#0078d7';
-                    downloadBtn.style.cursor = downloadBtn.disabled ? 'not-allowed' : 'pointer';
-                    console.log(`CSV下载按钮状态: ${downloadBtn.disabled ? '禁用' : '启用'}`);
-                } else {
-                    console.error("未找到id为downloadCsvBtn的元素");
-                }
-                return;
-            }
-
-            // 提取表头
-            const headers = Object.keys(data[0]);
-
-            // 生成CSV内容
-            let csvContent = headers.join(',') + '\n';
-
-            // 添加UTF-8 BOM，确保飞书能正确识别编码
-            const bom = '﻿';
-            csvContent = bom + csvContent;
-
-            // 添加数据行
-            data.forEach(item => {
-                const row = headers.map(header => {
-                    // 处理包含逗号或引号的数据
-                    let value = item[header] || '';
-
-                    // 优化日期格式（如果是日期字段）
-                    if (header === 'dtMsgTime' && value) {
-                        // 尝试将日期字符串转换为更标准的格式
-                        try {
-                            // 检查原始值是否已经是ISO格式
-                            if (value.includes('T') && value.includes('Z')) {
-                                // 直接处理ISO格式
-                                value = value.slice(0, 19).replace('T', ' ');
-                            } else {
-                                // 尝试解析其他格式
-                                const date = new Date(value);
-                                if (!isNaN(date.getTime())) {
-                                    // 转换为YYYY-MM-DD HH:mm:ss格式
-                                    value = date.toISOString().slice(0, 19).replace('T', ' ');
-                                }
-                            }
-                        } catch (e) {
-                            console.error('日期格式转换失败:', e);
-                        }
-                    }
-
-                    if (typeof value === 'string') {
-                        // 替换双引号为两个双引号
-                        value = value.replace(/"/g, '""');
-                        // 如果包含逗号或换行符，用双引号包裹
-                        if (value.includes(',') || value.includes('\n')) {
-                            value = `"${value}"`;
-                        }
-                    }
-                    return value;
-                });
-                csvContent += row.join(',') + '\n';
-            });
-
-            // 创建Blob对象
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-
-            // 设置下载按钮
-            const downloadBtn = document.getElementById('downloadCsvBtn');
-            if (!downloadBtn) {
-                console.error("未找到id为downloadCsvBtn的元素");
-                return;
-            }
-            console.log("找到downloadCsvBtn元素，准备设置属性");
-            downloadBtn.href = url;
-            downloadBtn.download = 'chat_data.csv';
-            downloadBtn.style.display = 'inline-block';
-            console.log("下载按钮显示状态已设置为inline-block");
-
-            // 释放URL对象
-            downloadBtn.onclick = function () {
-                setTimeout(() => {
-                    URL.revokeObjectURL(url);
-                }, 100);
-            };
-        }
-
-        // 下载JSON文件
-        function downloadJson(data, startDate, endDate) {
-            const jsonContent = JSON.stringify(data, null, 2);
-            const blob = new Blob([jsonContent], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-
-            const a = document.createElement('a');
-            a.href = url;
-            // 文件名包含日期范围
-           
-            const fileName = tehsh && tehshs
-                ? `chat_records_${tehsh}_to_${tehshs}.json`
-                : 'chat_records_' + new Date().toISOString().slice(0, 10) + '.json';
-            a.download = fileName;
-            document.body.appendChild(a);
-            requestAnimationFrame(() => {
-                a.click();
-                // 清理
-                setTimeout(() => {
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                }, 500);
-            });
-        }
-    </script>
+<!-- 引入 CryptoJS（AES 解密库）-->
+<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
 </body>
-
 </html>
