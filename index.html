@@ -157,7 +157,7 @@
         };
 
         // Token管理
-        let ACCESS_TOKEN = localStorage.getItem('access_token');
+        let ACCESS_TOKEN = null; // 每次启动都重新获取token
 
         // AES配置
         const AES_CONFIG = {
@@ -242,20 +242,50 @@
             return result;
         }
 
+        async function login() {
+            try {
+                const payload = {
+                    clientId: API_CONFIG.clientId,
+                    clientSecret: API_CONFIG.clientSecret
+                };
+
+                const response = await fetch(API_CONFIG.baseURL + API_CONFIG.loginEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`登录请求失败: HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.code === 0 && result.data && result.data.value) {
+                    ACCESS_TOKEN = result.data.value;
+                    return ACCESS_TOKEN;
+                } else {
+                    throw new Error('登录失败: ' + (result.message || '未知错误'));
+                }
+            } catch (error) {
+                throw new Error('登录失败: ' + error.message);
+            }
+        }
+
         async function makeApiRequest(endpoint, payload) {
             const url = API_CONFIG.baseURL + endpoint;
             
-            if (!ACCESS_TOKEN && endpoint !== API_CONFIG.loginEndpoint) {
-                await login();
+            // 确保先获取token
+            if (!ACCESS_TOKEN) {
+                throw new Error('未获取到token，请先调用login()');
             }
 
             const headers = {
-                'Content-Type': 'application/json'
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${ACCESS_TOKEN}`
             };
-
-            if (endpoint !== API_CONFIG.loginEndpoint) {
-                headers['Authorization'] = `Bearer ${ACCESS_TOKEN}`;
-            }
 
             const response = await fetch(url, {
                 method: 'POST',
@@ -264,31 +294,10 @@
             });
 
             if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
+                throw new Error(`API请求失败: HTTP ${response.status}`);
             }
 
             return await response.json();
-        }
-
-        async function login() {
-            try {
-                const payload = {
-                    clientId: API_CONFIG.clientId,
-                    clientSecret: API_CONFIG.clientSecret
-                };
-
-                const response = await makeApiRequest(API_CONFIG.loginEndpoint, payload);
-                
-                if (response.code === 0 && response.data && response.data.accessToken) {
-                    ACCESS_TOKEN = response.data.accessToken;
-                    localStorage.setItem('access_token', ACCESS_TOKEN);
-                    return ACCESS_TOKEN;
-                } else {
-                    throw new Error('登录失败: ' + (response.message || '未知错误'));
-                }
-            } catch (error) {
-                throw new Error('登录失败: ' + error.message);
-            }
         }
 
         function formatMessageTime(timestamp) {
@@ -335,6 +344,10 @@
 
         async function loadChatHistory() {
             try {
+                // 步骤1：先获取token
+                document.getElementById('chatMessages').innerHTML = '<div class="loading">正在获取访问权限...</div>';
+                await login();
+
                 const params = getUrlParams();
                 
                 if (!params.rd || !params.fsw || !params.mid || !params.uid) {
@@ -342,7 +355,7 @@
                     return;
                 }
 
-                // 解密参数
+                // 步骤2：解密参数
                 const decryptedParams = {};
                 const encryptedParams = ['rd', 'fsw', 'mid', 'uid', 'un', 'nc', 'fnc', 'ts', 'fp', 'rta', 'orderId'];
                 
@@ -352,6 +365,9 @@
                     decryptedParams[key] = isEncrypted ? decrypt(decodedValue) : decodedValue;
                 }
 
+                // 步骤3：获取聊天记录
+                document.getElementById('chatMessages').innerHTML = '<div class="loading">正在加载聊天记录...</div>';
+                
                 let allMessages = [];
                 let hasError = false;
 
