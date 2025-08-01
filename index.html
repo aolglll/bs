@@ -1,60 +1,553 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <title>企微参数解析</title>
-  <style>
-    body{font-family:Arial,Helvetica,sans-serif;margin:20px;font-size:14px;}
-    .key{font-weight:bold;margin-top:10px;}
-    .val{margin-left:20px;word-break:break-all;}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>企微参数一键解密</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 28px;
+            font-weight: 600;
+        }
+        .content {
+            padding: 30px;
+        }
+        .section {
+            margin-bottom: 30px;
+        }
+        .section h2 {
+            color: #333;
+            border-bottom: 2px solid #4facfe;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+        .param-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+        }
+        .param-item {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #4facfe;
+        }
+        .param-name {
+            font-weight: bold;
+            color: #4facfe;
+            margin-bottom: 5px;
+        }
+        .param-value {
+            font-family: monospace;
+            background: #e9ecef;
+            padding: 8px;
+            border-radius: 4px;
+            word-break: break-all;
+            margin-bottom: 5px;
+        }
+        .param-desc {
+            font-size: 12px;
+            color: #666;
+        }
+        .decrypt-btn {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: transform 0.2s;
+        }
+        .decrypt-btn:hover {
+            transform: translateY(-2px);
+        }
+        .error {
+            color: #e74c3c;
+            background: #ffeaa7;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .success {
+            color: #00b894;
+            background: #55efc4;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+    </style>
 </head>
 <body>
-  <h1>企微 URL 参数解析结果</h1>
-  <div id="result">正在解析…</div>
+    <div class="container">
+        <div class="header">
+            <h1>企微参数终极解密</h1>
+            <p>一键解密URL参数，获取明文数据</p>
+        </div>
+        
+        <div class="content">
+            <div class="section">
+                <h2>解密结果</h2>
+                <button class="decrypt-btn" onclick="autoDecrypt()">一键解密当前URL</button>
+                <div id="result"></div>
+            </div>
 
-<script>
-/* ---------------- 1. 固定配置 ---------------- */
-const KEY = '03A1B7280B5BC-F60B934C-CABD-4272-94EF-CF99BAF32B8D';
-const IV  = '03A1B7280B5BC-3053BBF3-0A52-4A49-ACD8-AF5CC45C96F3';
+            <div class="section">
+                <h2>参数说明</h2>
+                <div class="param-grid">
+                    <div class="param-item">
+                        <div class="param-name">rd</div>
+                        <div class="param-desc">助手ID（加密）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">fsw</div>
+                        <div class="param-desc">好友ID（加密）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">fsh</div>
+                        <div class="param-desc">好友微信号（加密）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">uid</div>
+                        <div class="param-desc">客服编号/操作员编号（明文显示）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">un</div>
+                        <div class="param-desc">客服名称/操作员名称（加密）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">mid</div>
+                        <div class="param-desc">商家编号（明文显示）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">nc</div>
+                        <div class="param-desc">号昵称（加密）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">fnc</div>
+                        <div class="param-desc">好友昵称（加密）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">ts</div>
+                        <div class="param-desc">时间戳（加密）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">fp</div>
+                        <div class="param-desc">客户头像（加密）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">rta</div>
+                        <div class="param-desc">助手账号（加密）</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">orderId</div>
+                        <div class="param-desc">订单id(加密)</div>
+                    </div>
+                </div>
+            </div>
 
-/* 取 16 字节 hex（AES-128-CBC 需要 128 bit） */
-const keyHex = KEY.replace(/-/g,'').slice(0,32);
-const ivHex  = IV.replace(/-/g,'').slice(0,32);
+            <div class="section">
+                <h2>密钥配置</h2>
+                <div class="param-grid">
+                    <div class="param-item">
+                        <div class="param-name">密钥(Key)</div>
+                        <div class="param-value">03A1B7280B5BC-F60B934C-CABD-4272-94EF-CF99BAF32B8D</div>
+                    </div>
+                    <div class="param-item">
+                        <div class="param-name">偏移量(IV)</div>
+                        <div class="param-value">03A1B7280B5BC-3053BBF3-0A52-4A49-ACD8-AF5CC45C96F3</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-/* ---------------- 2. 解密函数 ---------------- */
-function decrypt(base64Cipher){
-  try{
-    const decrypted = CryptoJS.AES.decrypt(
-      { ciphertext: CryptoJS.enc.Base64.parse(base64Cipher) },
-      CryptoJS.enc.Hex.parse(keyHex),
-      { iv: CryptoJS.enc.Hex.parse(ivHex), mode: CryptoJS.mode.CBC, padding: CryptoJS.pad.Pkcs7 }
-    );
-    return decrypted.toString(CryptoJS.enc.Utf8) || '(解密为空)';
-  }catch(e){
-    return '(解密异常)';
-  }
-}
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
+    <script>
 
-/* ---------------- 3. 解析 & 展示 ---------------- */
-const params = new URLSearchParams(location.search);
-const encryptedKeys = [
-  'rd','fsw','fsh','ph','un','qd','srm','rm',
-  'nc','fnc','rn','ts','fp','rtp','rta','fopenid','orderId'
-];
+        // API配置 - bilinl.com
+        const API_CONFIG = {
+            baseURL: 'https://gateway.bilinl.com',
+            loginEndpoint: '/thirdparty/user/login/client',
+            chatEndpoint: '/thirdparty/customer/getChatMsgDetail',
+            clientId: 'dnLdwzaZrf2ONfKvjRF1YV9FUmVHdxN0',
+            clientSecret: '9EtL5VzwrAGWAVCXCSjs6g1nglq9OiWb'
+        };
 
-let html = '';
-for (const [k, v] of params){
-  let show = v || '(空)';
-  if (v && encryptedKeys.includes(k)){
-    show = decrypt(decodeURIComponent(v));
-  }
-  html += `<div class="key">${k}</div><div class="val">${show}</div>`;
-}
-document.getElementById('result').innerHTML = html;
-</script>
+        // Token管理
+        let ACCESS_TOKEN = localStorage.getItem('access_token');
+        let TOKEN_EXPIRY = localStorage.getItem('token_expiry');
 
-<!-- CryptoJS CDN -->
-<script src="https://cdn.jsdelivr.net/npm/crypto-js@4.1.1/crypto-js.min.js"></script>
+        // 获取Token
+        async function getToken() {
+            try {
+                const response = await fetch(API_CONFIG.baseURL + API_CONFIG.loginEndpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        clientId: API_CONFIG.clientId,
+                        clientSecret: API_CONFIG.clientSecret
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`获取Token失败: HTTP ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.code === 0 && result.data && result.data.value) {
+                    ACCESS_TOKEN = result.data.value;
+                    TOKEN_EXPIRY = result.data.expiredTime || Date.now() + 3600000; // 默认1小时
+                    
+                    localStorage.setItem('access_token', ACCESS_TOKEN);
+                    localStorage.setItem('token_expiry', TOKEN_EXPIRY);
+                    
+                    console.log('Token获取成功:', ACCESS_TOKEN);
+                    return ACCESS_TOKEN;
+                } else {
+                    throw new Error(result.message || '获取Token失败');
+                }
+            } catch (error) {
+                console.error('Token获取失败:', error);
+                throw error;
+            }
+        }
+
+        // 检查Token是否有效
+        async function ensureValidToken() {
+            const now = Date.now();
+            if (!ACCESS_TOKEN || !TOKEN_EXPIRY || now >= TOKEN_EXPIRY) {
+                console.log('Token无效或过期，重新获取...');
+                return await getToken();
+            }
+            return ACCESS_TOKEN;
+        }
+
+        // 带Token的API请求
+        async function makeApiRequest(endpoint, data) {
+            try {
+                const token = await ensureValidToken();
+                
+                const response = await fetch(API_CONFIG.baseURL + endpoint, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json',
+                        'Authorization': 'Bearer ' + token
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    if (response.status === 401) {
+                        // Token过期，清除并重新获取
+                        ACCESS_TOKEN = null;
+                        TOKEN_EXPIRY = null;
+                        localStorage.removeItem('access_token');
+                        localStorage.removeItem('token_expiry');
+                        throw new Error('Token已过期，请重试');
+                    }
+                    throw new Error(`API调用失败: HTTP ${response.status}`);
+                }
+
+                return await response.json();
+            } catch (error) {
+                console.error('API请求失败:', error);
+                throw error;
+            }
+        }
+
+        // 获取聊天记录API（带Token）
+        async function fetchChatHistory(decryptedParams, queryType = 'crossMonth14') {
+            const now = new Date();
+            let startDate;
+            
+            if (queryType === 'crossMonth14') {
+                // 首次查询：14天跨月范围
+                startDate = new Date(now);
+                startDate.setDate(startDate.getDate() - 14);
+            } else if (queryType === 'currentMonth') {
+                // 回退方案：当天到本月1号
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+            }
+            
+            // 设置开始时间为00:00:00
+            const startTime = new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate(), 0, 0, 0);
+            // 设置结束时间为当前时间
+            const endTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+            const payload = {
+                customerId: decryptedParams.fsw || '', // 好友ID -> customerId
+                endTime: endTime.toISOString(),
+                kpMerchantNo: '', // 平台商家编号
+                merchantId: decryptedParams.mid || '', // 商家编号 -> merchantId
+                ntype: 10, // 私聊
+                pageIndex: 0,
+                pageSize: 20,
+                robotId: decryptedParams.rd || '', // 助手ID -> robotId
+                searchKey: '',
+                startTime: startTime.toISOString(),
+                sysUserId: decryptedParams.uid || '' // 客服编号 -> sysUserId
+            };
+
+            return await makeApiRequest(API_CONFIG.chatEndpoint, payload);
+        }
+
+        // 加载聊天记录
+        async function loadChatHistory(decryptedParams) {
+            try {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = '<div class="success">正在加载聊天记录...</div>';
+                
+                // 首次查询：14天跨月范围
+                let data = await fetchChatHistory(decryptedParams, 'crossMonth14');
+                
+                // 如果返回错误码1000（跨月查询失败），回退到当天到本月1号
+                if (data.code === 1000) {
+                    console.log('14天跨月查询失败，回退到本月1号查询...');
+                    resultDiv.innerHTML = '<div class="success">检测到跨月限制，正在调整为查询本月1号到今天的数据...</div>';
+                    data = await fetchChatHistory(decryptedParams, 'currentMonth');
+                }
+                
+                if (data.code === 0 && data.data && data.data.list) {
+                    const messages = data.data.list;
+                    let html = '<h3>聊天记录</h3>';
+                    html += '<div style="max-height: 400px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; margin-top: 10px;">';
+                    
+                    messages.forEach(msg => {
+                        const time = new Date(msg.createTime).toLocaleString();
+                        const sender = msg.fromType === 1 ? '客服' : '客户';
+                        html += `
+                            <div style="margin: 10px 0; padding: 8px; background: ${msg.fromType === 1 ? '#e3f2fd' : '#f5f5f5'}; border-radius: 4px;">
+                                <div style="font-size: 12px; color: #666;">${time} - ${sender}</div>
+                                <div>${msg.content || '[图片/文件]'}</div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    resultDiv.innerHTML = html;
+                } else if (data.code === 1000) {
+                    // 仍然跨月错误，显示友好提示
+                    resultDiv.innerHTML = '<div class="error">查询时间范围错误！已自动调整为查询本月1号到今天的数据。</div>';
+                } else {
+                    resultDiv.innerHTML = '<div class="error">获取聊天记录失败: ' + (data.message || '未知错误') + '</div>';
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = '<div class="error">加载聊天记录失败: ' + error.message + '</div>';
+            }
+        }
+
+        // AES解密配置
+        const AES_CONFIG = {
+            KEY: '03A1B7280B5BC-F60B934C-CABD-4272-94EF-CF99BAF32B8D',
+            IV: '03A1B7280B5BC-3053BBF3-0A52-4A49-ACD8-AF5CC45C96F3'
+        };
+
+        // URL编码修复函数
+        function fixUrlEncoding(str) {
+            if (!str) return str;
+            return str.replace(/\s/g, '+');
+        }
+
+        // URL解码函数
+        function urlDecode(str) {
+            try {
+                return decodeURIComponent(str);
+            } catch (e) {
+                return str;
+            }
+        }
+
+        // AES解密函数（与Java版本完全一致）
+        function decrypt(data) {
+            try {
+                if (!data || typeof data !== 'string') {
+                    return '为空';
+                }
+                
+                // 修复URL编码
+                data = fixUrlEncoding(data);
+                
+                // 确保CryptoJS已加载
+                if (typeof CryptoJS === 'undefined') {
+                    throw new Error('CryptoJS库未加载');
+                }
+                
+                // 截取密钥和IV的前32位和16位
+                const key = AES_CONFIG.KEY.substring(0, 32);
+                const iv = AES_CONFIG.IV.substring(0, 16);
+                
+                console.log('解密参数:', {
+                    originalData: data,
+                    key: key,
+                    iv: iv
+                });
+                
+                try {
+                    // 方法1：使用CryptoJS标准解密
+                    const keyWordArray = CryptoJS.enc.Utf8.parse(key);
+                    const ivWordArray = CryptoJS.enc.Utf8.parse(iv);
+                    
+                    // 先尝试直接解密
+                    let decrypted = CryptoJS.AES.decrypt(data, keyWordArray, {
+                        iv: ivWordArray,
+                        mode: CryptoJS.mode.CBC,
+                        padding: CryptoJS.pad.Pkcs7
+                    });
+                    
+                    let result = decrypted.toString(CryptoJS.enc.Utf8);
+                    
+                    if (result && result.trim()) {
+                        console.log('解密成功:', result);
+                        return result.trim();
+                    }
+                    
+                    // 方法2：手动Base64解码后解密
+                    const encryptedWordArray = CryptoJS.enc.Base64.parse(data);
+                    const decrypted2 = CryptoJS.AES.decrypt(
+                        { ciphertext: encryptedWordArray },
+                        keyWordArray,
+                        {
+                            iv: ivWordArray,
+                            mode: CryptoJS.mode.CBC,
+                            padding: CryptoJS.pad.Pkcs7
+                        }
+                    );
+                    
+                    result = decrypted2.toString(CryptoJS.enc.Utf8);
+                    console.log('方法2解密结果:', result);
+                    if (result && result.trim()) {
+                        return result.trim();
+                    }
+                    
+                    throw new Error('解密失败: 无法解析数据');
+                    
+                } catch (e) {
+                    throw new Error('解密过程错误: ' + e.message);
+                }
+            } catch (e) {
+                console.error('解密失败:', e);
+                return e.message;
+            }
+        }
+
+        // 获取URL参数
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            const result = {};
+            for (const [key, value] of params) {
+                result[key] = value;
+            }
+            return result;
+        }
+
+        // 自动解密函数
+    function autoDecrypt() {
+        const params = getUrlParams();
+        const resultDiv = document.getElementById('result');
+        
+        if (Object.keys(params).length === 0) {
+            resultDiv.innerHTML = '<div class="error">未检测到URL参数，请确保URL中包含需要解密的参数</div>';
+            return;
+        }
+
+        let html = '<div class="param-grid">';
+        let successCount = 0;
+        let failCount = 0;
+        
+        // 定义需要解密的参数
+        const encryptedParams = ['rd', 'fsw', 'fsh', 'un', 'nc', 'fnc', 'rn', 'ts', 'fp', 'rtp', 'rta', 'fopenid', 'orderId', 'chatkey', 'pendingId'];
+        
+        // 存储解密后的数据供API使用
+        const decryptedData = {};
+        
+        // 处理每个参数
+        for (const [key, value] of Object.entries(params)) {
+            const isEncrypted = encryptedParams.includes(key);
+            const decodedValue = urlDecode(value);
+            const decryptedValue = isEncrypted ? decrypt(decodedValue) : decodedValue;
+            
+            if (isEncrypted && decryptedValue && !decryptedValue.startsWith('解密失败')) {
+                successCount++;
+                decryptedData[key] = decryptedValue;
+            } else if (isEncrypted) {
+                failCount++;
+                decryptedData[key] = decryptedValue;
+            } else {
+                decryptedData[key] = decodedValue;
+            }
+            
+            const displayValue = decryptedValue || (isEncrypted ? '' : decodedValue || '');
+            html += `
+                    <div class="param-item">
+                        <div class="param-name">${key} ${isEncrypted && decryptedValue && !decryptedValue.startsWith('解密失败') ? '(已解密)' : ''}</div>
+                        <div class="param-value">${displayValue || ''}</div>
+                        ${value ? `<div class="param-desc">原始值: ${value}</div>` : ''}
+                    </div>
+                `;
+        }
+        
+        html += '</div>';
+        
+        // 添加获取聊天记录按钮
+        if (decryptedData.fsw && decryptedData.rd) {
+            html += `
+                <div style="margin: 20px 0;">
+                    <button class="decrypt-btn" onclick="loadChatHistory(window.decryptedData)">获取聊天记录</button>
+                    <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                        使用解密后的参数调用获取聊天记录接口
+                    </p>
+                </div>
+            `;
+        }
+        
+        html += `<div style="margin-top: 20px; padding: 10px; background: #f8f9fa; border-radius: 4px;">
+            <strong>解密统计:</strong> 成功 ${successCount} 个, 失败 ${failCount} 个
+        </div>`;
+        
+        resultDiv.innerHTML = html;
+        
+        // 存储解密数据供API使用
+        window.decryptedData = decryptedData;
+    }
+
+        // 页面加载时自动执行
+        window.addEventListener('load', function() {
+            // 检查是否有URL参数
+            if (window.location.search) {
+                autoDecrypt();
+            }
+        });
+
+        // 监听URL变化
+        window.addEventListener('popstate', autoDecrypt);
+    </script>
 </body>
 </html>
